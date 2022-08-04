@@ -1,7 +1,9 @@
 import {
   Address,
   BigInt,
+  Bytes,
   JSONValueKind,
+  ethereum,
   json,
   log,
 } from "@graphprotocol/graph-ts";
@@ -15,196 +17,126 @@ import {
 } from "../generated/Treasure Fraction/ERC1155";
 import { Transfer as TransferEvent } from "../generated/Treasure/ERC721";
 import { L1Treasure } from "../generated/Treasure/L1Treasure";
-import { Asset, Transfer, User, UserAsset } from "../generated/schema";
-import { base64Decode } from "./helpers";
+import { TokenTransfer, User } from "../generated/schema";
+import { decode } from "./helpers/base64";
+import { getTokenIdByTreasureName } from "./helpers/token-id";
 
-function addAssetToUser(asset: Asset, user: User): void {
-  let id = `${user.id}-${asset.id}`;
-  let userAsset = UserAsset.load(id);
-
-  if (!userAsset) {
-    userAsset = new UserAsset(id);
-
-    userAsset.asset = asset.id;
-    userAsset.user = user.id;
-  }
-
-  userAsset.quantity = userAsset.quantity + 1;
-  userAsset.save();
-}
-
-function getAsset(name: string): Asset {
-  let id = name
-    .replace("Carrage", "Carriage")
-    .replace("Silver Penny", "Silver Coin")
-    .replace("Red FeatherSnow White Feather", "Snow White Feather")
-    .replace("Red and White Feather", "Snow White Feather");
-
-  let asset = Asset.load(id);
-
-  if (!asset) {
-    asset = new Asset(id);
-    asset.save();
-  }
-
-  return asset;
-}
-
-function getFraction(address: Address, tokenId: BigInt): Asset | null {
-  let contract = ERC1155.bind(address);
-
-  // Base64 string
-  let uri = contract.uri(tokenId);
-  let bytes = base64Decode(uri);
-  let length = bytes.length;
-  let string = "";
-
-  for (let index = 0; index < length; index++) {
-    string += String.fromCharCode(bytes.at(index));
-  }
-
-  let data = json.fromString(string);
-
-  if (data.kind == JSONValueKind.OBJECT) {
-    let name = data.toObject().get("name");
-
-    if (name != null) {
-      return getAsset(name.toString());
-    }
-  }
-
-  return null;
-}
-
-function getTransfer(
-  user: Address,
-  tokenId: BigInt,
-  contract: string
-): Transfer {
-  let id = `${user.toHexString()}-${tokenId.toString()}`;
-  let transfer = Transfer.load(id);
-
-  if (!transfer) {
-    transfer = new Transfer(id);
-
-    transfer.contract = contract;
-    transfer.tokenId = tokenId;
-    transfer.user = getUser(user).id;
-  }
-
-  return transfer;
-}
-
-function getUser(address: Address): User {
-  let id = address.toHexString();
+const getOrCreateUser = (address: Address): User => {
+  const id = address.toHexString();
   let user = User.load(id);
-
   if (!user) {
     user = new User(id);
     user.save();
   }
 
   return user;
-}
+};
 
-function handleTransfer(
-  contract: string,
-  from: Address,
+const createOrUpdatedTransfer = (
+  event: ethereum.Event,
+  userAddress: Address,
   tokenId: BigInt,
-  quantity: BigInt,
-  to: Address,
-  block: BigInt
-): void {
-  if (to.notEqual(BURNER_ADDRESS)) {
-    return;
+  quantity: BigInt
+): void => {
+  const user = getOrCreateUser(userAddress);
+  const id = `${event.transaction.hash.toHexString()}-${tokenId.toString()}`;
+  let transfer = TokenTransfer.load(id);
+  if (!transfer) {
+    transfer = new TokenTransfer(id);
+    transfer.blockNumber = event.block.number;
+    transfer.user = user.id;
+    transfer.tokenId = tokenId;
+    transfer.quantity = 0;
   }
 
-  // Some were sent after this block, but this is when the migration closed
-  if (block.gt(BigInt.fromString("13768569"))) {
-    return;
-  }
-
-  let transfer = getTransfer(from, tokenId, contract);
-
-  transfer.quantity = transfer.quantity + quantity.toI32();
+  transfer.quantity += quantity.toI32();
   transfer.save();
-}
+};
+
+const getTokenIdForFraction = (
+  address: Address,
+  tokenId: BigInt
+): BigInt | null => {
+  const contract = ERC1155.bind(address);
+  const uri = Bytes.fromUint8Array(
+    decode(contract.uri(tokenId).replace("data:application/json;base64,", ""))
+  );
+  const data = json.fromBytes(uri);
+  if (data.kind == JSONValueKind.OBJECT) {
+    const name = data.toObject().get("name");
+    if (name != null) {
+      return getTokenIdByTreasureName(name.toString());
+    }
+  }
+
+  log.warning("Mapped token ID for fraction not found: {}", [
+    tokenId.toString(),
+  ]);
+  return null;
+};
 
 export function handleTransfer721(event: TransferEvent): void {
-  let params = event.params;
-  let tokenId = params.tokenId;
+  const params = event.params;
 
-  handleTransfer(
-    "Treasure",
-    params.from,
-    tokenId,
-    BigInt.fromI32(1),
-    params.to,
-    event.block.number
-  );
+  // Only handle transfers sent to the burn address
+  if (params.to.notEqual(BURNER_ADDRESS)) {
+    return;
+  }
 
-  let contract = L1Treasure.bind(event.address);
-  let assets: string[] = [];
+  // Fetch token names for all assets in this loot token
+  const tokenId = params.tokenId;
+  const contract = L1Treasure.bind(event.address);
+  const assets: string[] = [
+    contract.getAsset1(tokenId),
+    contract.getAsset2(tokenId),
+    contract.getAsset3(tokenId),
+    contract.getAsset4(tokenId),
+    contract.getAsset5(tokenId),
+    contract.getAsset6(tokenId),
+    contract.getAsset7(tokenId),
+    contract.getAsset8(tokenId),
+  ];
 
-  assets.push(contract.getAsset1(tokenId));
-  assets.push(contract.getAsset2(tokenId));
-  assets.push(contract.getAsset3(tokenId));
-  assets.push(contract.getAsset4(tokenId));
-  assets.push(contract.getAsset5(tokenId));
-  assets.push(contract.getAsset6(tokenId));
-  assets.push(contract.getAsset7(tokenId));
-  assets.push(contract.getAsset8(tokenId));
-
-  let user = getUser(params.from);
-
-  for (let index = 0; index < 8; index++) {
-    addAssetToUser(getAsset(assets[index]), user);
+  for (let index = 0; index < assets.length; index++) {
+    createOrUpdatedTransfer(
+      event,
+      params.from,
+      getTokenIdByTreasureName(assets[index]),
+      BigInt.fromI32(1)
+    );
   }
 }
 
 export function handleTransferSingle(event: TransferSingle): void {
-  let params = event.params;
+  const params = event.params;
 
-  handleTransfer(
-    "TreasureFraction",
-    params.from,
-    params.id,
-    params.value,
-    params.to,
-    event.block.number
-  );
+  // Only handle transfers sent to the burn address
+  if (params.to.notEqual(BURNER_ADDRESS)) {
+    return;
+  }
 
-  let asset = getFraction(event.address, params.id);
-
-  if (asset) {
-    addAssetToUser(asset, getUser(params.from));
+  // Fetch token name for asset in this fraction token
+  const tokenId = getTokenIdForFraction(event.address, params.id);
+  if (tokenId) {
+    createOrUpdatedTransfer(event, params.from, tokenId, BigInt.fromI32(1));
   }
 }
 
 export function handleTransferBatch(event: TransferBatch): void {
-  let params = event.params;
-  let ids = params.ids;
-  let quantities = params.values;
-  let length = ids.length;
-  let user = getUser(params.from);
+  const params = event.params;
 
-  for (let index = 0; index < length; index++) {
-    let id = ids[index];
-    let quantity = quantities[index];
+  // Only handle transfers sent to the burn address
+  if (params.to.notEqual(BURNER_ADDRESS)) {
+    return;
+  }
 
-    handleTransfer(
-      "TreasureFraction",
-      params.from,
-      id,
-      quantity,
-      params.to,
-      event.block.number
-    );
-
-    let asset = getFraction(event.address, id);
-
-    if (asset) {
-      addAssetToUser(asset, user);
+  const ids = params.ids;
+  const quantities = params.values;
+  for (let index = 0; index < ids.length; index++) {
+    // Fetch token name for asset in this fraction token
+    const tokenId = getTokenIdForFraction(event.address, ids[index]);
+    if (tokenId) {
+      createOrUpdatedTransfer(event, params.from, tokenId, quantities[index]);
     }
   }
 }

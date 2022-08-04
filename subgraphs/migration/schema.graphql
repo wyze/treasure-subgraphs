@@ -1,32 +1,21 @@
-enum Contract {
-  Treasure
-  TreasureFraction
-}
-
-type Asset @entity {
-  id: ID!
-}
-
-type Transfer @entity {
-  id: ID!
-
-  contract: Contract!
-  quantity: Int!
-  tokenId: BigInt!
-  user: User!
-}
-
 type User @entity {
   id: ID!
 
-  assets: [UserAsset!]! @derivedFrom(field: "user")
-  transfers: [Transfer!]! @derivedFrom(field: "user")
+  tokens: [TokenTransfer!]! @derivedFrom(field: "user")
 }
 
-type UserAsset @entity {
+type TokenTransfer @entity {
   id: ID!
 
-  asset: Asset!
-  quantity: Int!
+  "Block number in which the original asset was transferred"
+  blockNumber: BigInt!
+
+  "User who transferred the asset"
   user: User!
+
+  "Mapped Arbitrum network token ID for the transferred asset"
+  tokenId: BigInt!
+
+  "Amount of assets transferred"
+  quantity: Int!
 }

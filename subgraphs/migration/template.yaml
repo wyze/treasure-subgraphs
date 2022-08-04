@@ -14,7 +14,7 @@ dataSources:
       apiVersion: 0.0.6
       language: wasm/assemblyscript
       entities:
-        - Transfer
+        - TokenTransfer
         - User
       abis:
         - name: ERC721
@@ -37,7 +37,7 @@ dataSources:
       apiVersion: 0.0.6
       language: wasm/assemblyscript
       entities:
-        - Transfer
+        - TokenTransfer
         - User
       abis:
         - name: ERC1155
