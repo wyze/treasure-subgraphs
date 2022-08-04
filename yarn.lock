@@ -480,6 +480,14 @@ assemblyscript@^0.19.20:
     long "^5.2.0"
     source-map-support "^0.5.20"
 
+assemblyscript@^0.20.16:
+  version "0.20.16"
+  resolved "https://registry.yarnpkg.com/assemblyscript/-/assemblyscript-0.20.16.tgz#a0c51d8ef8263bb2508f55052baef44cadf98091"
+  integrity sha512-scwMytSJI/5DFVD2dZBvgCNF0SJ77ZtxM7wUqyyrcKB/C1wuaWgFiEU532LHBDY7+APUVMkGEfpn1+Vb97Xpdg==
+  dependencies:
+    binaryen "108.0.0-nightly.20220528"
+    long "^5.2.0"
+
 assert-plus@1.0.0, assert-plus@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/assert-plus/-/assert-plus-1.0.0.tgz"
@@ -576,6 +584,11 @@ binaryen@102.0.0-nightly.20211028:
   version "102.0.0-nightly.20211028"
   resolved "https://registry.npmjs.org/binaryen/-/binaryen-102.0.0-nightly.20211028.tgz"
   integrity sha512-GCJBVB5exbxzzvyt8MGDv/MeUjs6gkXDvf4xOIItRBptYl0Tz5sm1o/uG95YK0L0VeG5ajDu3hRtkBP2kzqC5w==
+
+binaryen@108.0.0-nightly.20220528:
+  version "108.0.0-nightly.20220528"
+  resolved "https://registry.yarnpkg.com/binaryen/-/binaryen-108.0.0-nightly.20220528.tgz#55e50ec50dc3cded36ad02e68ec69eb69bbb1e7b"
+  integrity sha512-9biG357fx3NXmJNotIuY9agZBcCNHP7d1mgOGaTlPYVHZE7/61lt1IyHCXAL+W5jUOYgmFZ260PR4IbD19RKuA==
 
 bindings@^1.5.0:
   version "1.5.0"
